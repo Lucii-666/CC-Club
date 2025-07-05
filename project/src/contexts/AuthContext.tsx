@@ -1,174 +1,124 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '../types';
+import {
+  auth,
+  db
+} from '../firebase';
+
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
+} from 'firebase/auth';
+
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc
+} from 'firebase/firestore';
+
+// Types
+interface User {
+  uid: string;
+  email: string;
+  role: 'student' | 'admin' | 'super-admin';
+}
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  signup: (userData: Omit<User, 'id' | 'createdAt'> & { password: string }) => Promise<boolean>;
-  resetPassword: (email: string) => Promise<boolean>;
-  createAdmin: (userData: Omit<User, 'id' | 'createdAt'> & { password: string }) => Promise<boolean>;
-  isLoading: boolean;
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+    enrollmentNo: string
+  ) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  logout: () => Promise<void>;
+  setRole: (uid: string, role: User['role']) => Promise<void>;
 }
 
+// Context creation
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john.doe@marwadiuniversity.ac.in',
-    enrollmentNo: 'MU2023001',
-    role: 'student',
-    password: 'password123',
-    createdAt: new Date('2023-01-15'),
-  },
-  {
-    id: '2',
-    name: 'Admin User',
-    email: 'admin@marwadiuniversity.ac.in',
-    enrollmentNo: 'MU2020001',
-    role: 'admin',
-    password: 'admin123',
-    createdAt: new Date('2020-01-01'),
-  },
-  {
-    id: '3',
-    name: 'Super Admin',
-    email: 'superadmin@marwadiuniversity.ac.in',
-    enrollmentNo: 'MU2019001',
-    role: 'super-admin',
-    password: 'superadmin123',
-    createdAt: new Date('2019-01-01'),
-  },
-  {
-  id: '4',
-  name: 'Ashutosh Kumar Singh',
-  email: 'ashutoshkumarsingh.120815@marwadiuniversity.ac.in',
-  enrollmentNo: 'MU2018001',
-  role: 'super-admin',
-  password: 'Ashutosh@123',
-  createdAt: new Date('2018-01-01'),
-}
-
-];
-
+// Provider
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
+  // Check for current user and fetch their role from Firestore
   useEffect(() => {
-    const savedUser = localStorage.getItem('circuitology_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        const ref = doc(db, 'users', firebaseUser.uid);
+        const snap = await getDoc(ref);
+        const data = snap.data();
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          role: data?.role || 'student',
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const foundUser = mockUsers.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('circuitology_user', JSON.stringify(userWithoutPassword));
-      setIsLoading(false);
-      return true;
+  // Signup logic with Firestore user data
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+    enrollmentNo: string
+  ) => {
+    const res = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, 'users', res.user.uid), {
+      email,
+      name,
+      enrollmentNo,
+      role: 'student',
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  // Login with session persistence (remember me support)
+  const login = async (email: string, password: string, rememberMe = false) => {
+    const persistenceType = rememberMe
+      ? browserLocalPersistence
+      : browserSessionPersistence;
+
+    await setPersistence(auth, persistenceType);
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  // Logout
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  // Update a user's role in Firestore
+  const setRole = async (uid: string, role: User['role']) => {
+    await updateDoc(doc(db, 'users', uid), { role });
+    if (user?.uid === uid) {
+      setUser((prev) => (prev ? { ...prev, role } : null));
     }
-    
-    setIsLoading(false);
-    return false;
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('circuitology_user');
-  };
-
-  const signup = async (userData: Omit<User, 'id' | 'createdAt'> & { password: string }): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Check if user already exists
-    const existingUser = mockUsers.find(u => u.email === userData.email);
-    if (existingUser) {
-      setIsLoading(false);
-      return false;
-    }
-    
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: userData.name,
-      email: userData.email,
-      enrollmentNo: userData.enrollmentNo,
-      role: userData.role,
-      createdAt: new Date(),
-    };
-    
-    mockUsers.push({ ...newUser, password: userData.password });
-    setUser(newUser);
-    localStorage.setItem('circuitology_user', JSON.stringify(newUser));
-    setIsLoading(false);
-    return true;
-  };
-
-  const createAdmin = async (userData: Omit<User, 'id' | 'createdAt'> & { password: string }): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Check if user already exists
-    const existingUser = mockUsers.find(u => u.email === userData.email);
-    if (existingUser) {
-      setIsLoading(false);
-      return false;
-    }
-    
-    const newAdmin: User = {
-      id: Date.now().toString(),
-      name: userData.name,
-      email: userData.email,
-      enrollmentNo: userData.enrollmentNo,
-      role: 'admin',
-      createdAt: new Date(),
-    };
-    
-    mockUsers.push({ ...newAdmin, password: userData.password });
-    setIsLoading(false);
-    return true;
-  };
-
-  const resetPassword = async (email: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const userExists = mockUsers.some(u => u.email === email);
-    setIsLoading(false);
-    return userExists;
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, signup, resetPassword, createAdmin, isLoading }}>
+    <AuthContext.Provider value={{ user, signup, login, logout, setRole }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Hook for usage
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };

@@ -11,27 +11,31 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
+    e.preventDefault();
+    setError('');
 
-  if (!email || !password) {
-    setError('Please fill in all fields');
-    return;
-  }
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
 
-  const success = await login(email, password);
-  if (success) {
-    navigate('/'); 
-  } else {
-    setError('Invalid email or password');
-  }
-};
-
-
+    try {
+      setIsLoading(true);
+      await login(email, password, rememberMe); // ✅ pass rememberMe
+      navigate('/');
+    } catch (err) {
+      setError('Invalid email or password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center py-12 px-4">
@@ -116,6 +120,8 @@ const Login: React.FC = () => {
                   id="remember-me"
                   type="checkbox"
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  checked={rememberMe}
+                  onChange={() => setRememberMe(!rememberMe)}
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                   Remember me
@@ -137,35 +143,18 @@ const Login: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLoading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                'Sign In'
-              )}
+              {isLoading ? <LoadingSpinner size="sm" /> : 'Sign In'}
             </motion.button>
 
             <div className="text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link to="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
                   Sign up
                 </Link>
               </p>
             </div>
           </form>
-
-          {/* Demo Credentials */}
-          {/* <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">Demo Credentials:</h3>
-            <div className="space-y-1 text-xs text-yellow-700">
-              {demoCredentials.map((cred, index) => (
-                <div key={index} className="flex justify-between">
-                  <span className="font-medium">{cred.role}:</span>
-                  <span>{cred.email} / {cred.password}</span>
-                </div>
-              ))}
-            </div>
-          </div> */}
         </motion.div>
       </div>
     </div>

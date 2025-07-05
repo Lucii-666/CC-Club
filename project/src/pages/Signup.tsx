@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Hash, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, Hash } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import CircuitBackground from '../components/ui/CircuitBackground';
@@ -9,103 +9,44 @@ import CircuitBackground from '../components/ui/CircuitBackground';
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
     enrollmentNo: '',
+    email: '',
     password: '',
-    confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  const { signup, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'password') {
-      setPasswordStrength(calculatePasswordStrength(value));
-    }
-  };
-
-  const calculatePasswordStrength = (password: string): number => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
-    return strength;
-  };
-
-  const getPasswordStrengthColor = (strength: number): string => {
-    switch (strength) {
-      case 0:
-      case 1: return 'bg-red-500';
-      case 2: return 'bg-orange-500';
-      case 3: return 'bg-yellow-500';
-      case 4: return 'bg-green-500';
-      case 5: return 'bg-green-600';
-      default: return 'bg-gray-300';
-    }
-  };
-
-  const getPasswordStrengthText = (strength: number): string => {
-    switch (strength) {
-      case 0:
-      case 1: return 'Very Weak';
-      case 2: return 'Weak';
-      case 3: return 'Fair';
-      case 4: return 'Good';
-      case 5: return 'Strong';
-      default: return '';
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (!formData.name || !formData.email || !formData.enrollmentNo || !formData.password || !formData.confirmPassword) {
+    const { name, enrollmentNo, email, password } = formData;
+    if (!name || !enrollmentNo || !email || !password) {
       setError('Please fill in all fields');
       return;
     }
 
-    if (!formData.email.endsWith('@marwadiuniversity.ac.in')) {
-      setError('Please use your university email address');
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (passwordStrength < 3) {
-      setError('Password is too weak. Please use a stronger password.');
-      return;
-    }
-
-    const success = await signup({
-      name: formData.name,
-      email: formData.email,
-      enrollmentNo: formData.enrollmentNo,
-      role: 'student',
-      password: formData.password,
-    });
-
-    if (success) {
+    try {
+      setIsLoading(true);
+      await signup(email, password, name, enrollmentNo);
       navigate('/dashboard');
-    } else {
-      setError('An account with this email already exists');
+    } catch (err) {
+      console.error(err);
+      setError('Signup failed. This email may already be registered.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center py-12 px-4">
       <CircuitBackground />
       <div className="max-w-md w-full space-y-8 relative z-10">
         <motion.div
@@ -115,13 +56,13 @@ const Signup: React.FC = () => {
         >
           <div className="text-center">
             <motion.div
-              className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-green-500 rounded-full flex items-center justify-center mb-6"
+              className="mx-auto w-16 h-16 bg-gradient-to-r from-green-600 to-blue-500 rounded-full flex items-center justify-center mb-6"
               whileHover={{ scale: 1.1 }}
             >
               <User className="w-8 h-8 text-white" />
             </motion.div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Join Circuitology</h2>
-            <p className="text-gray-600">Create your account and start innovating</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Your Account</h2>
+            <p className="text-gray-600">Join the Circuitology Club Portal</p>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -149,35 +90,16 @@ const Signup: React.FC = () => {
                     type="text"
                     required
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter your full name"
+                    placeholder="Your name"
                     value={formData.name}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  University Email
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="your.email@marwadiuniversity.ac.in"
-                    value={formData.email}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
 
               <div>
                 <label htmlFor="enrollmentNo" className="block text-sm font-medium text-gray-700 mb-2">
-                  Enrollment Number
+                  Enrollment No.
                 </label>
                 <div className="relative">
                   <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -187,9 +109,28 @@ const Signup: React.FC = () => {
                     type="text"
                     required
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter your enrollment number"
+                    placeholder="MU20XXXXX"
                     value={formData.enrollmentNo}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={handleChange}
                   />
                 </div>
               </div>
@@ -206,71 +147,18 @@ const Signup: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     required
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Create a strong password"
+                    placeholder="Enter your password"
                     value={formData.password}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <Lock /> : <Lock />}
                   </button>
                 </div>
-                {formData.password && (
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${getPasswordStrengthColor(passwordStrength)}`}
-                          style={{ width: `${(passwordStrength / 5) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-600">
-                        {getPasswordStrengthText(passwordStrength)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirm Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                {formData.confirmPassword && (
-                  <div className="mt-1 flex items-center space-x-1">
-                    {formData.password === formData.confirmPassword ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className={`text-xs ${formData.password === formData.confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-                      {formData.password === formData.confirmPassword ? 'Passwords match' : 'Passwords do not match'}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -281,11 +169,7 @@ const Signup: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLoading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                'Create Account'
-              )}
+              {isLoading ? <LoadingSpinner size="sm" /> : 'Sign Up'}
             </motion.button>
 
             <div className="text-center">
