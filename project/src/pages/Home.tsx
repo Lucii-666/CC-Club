@@ -111,7 +111,7 @@ const Home: React.FC = () => {
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
-                  to="/signup"
+                  to="https://forms.gle/coNT6VsmpfDW8pCU7"
                   className="inline-flex items-center justify-center px-8 py-4 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-200 font-medium text-lg shadow-lg hover:shadow-xl"
                 >
                   Join Our Club

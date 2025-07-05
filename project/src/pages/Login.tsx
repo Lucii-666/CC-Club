@@ -15,27 +15,23 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  e.preventDefault();
+  setError('');
 
-    if (!email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
+  if (!email || !password) {
+    setError('Please fill in all fields');
+    return;
+  }
 
-    const success = await login(email, password);
-    if (success) {
-      navigate('/dashboard');
-    } else {
-      setError('Invalid email or password');
-    }
-  };
+  const success = await login(email, password);
+  if (success) {
+    navigate('/'); 
+  } else {
+    setError('Invalid email or password');
+  }
+};
 
-  const demoCredentials = [
-    { role: 'Student', email: 'john.doe@marwadiuniversity.ac.in', password: 'password123' },
-    { role: 'Admin', email: 'admin@marwadiuniversity.ac.in', password: 'admin123' },
-    { role: 'Super Admin', email: 'superadmin@marwadiuniversity.ac.in', password: 'superadmin123' },
-  ];
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center py-12 px-4">
@@ -159,7 +155,7 @@ const Login: React.FC = () => {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          {/* <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <h3 className="text-sm font-medium text-yellow-800 mb-2">Demo Credentials:</h3>
             <div className="space-y-1 text-xs text-yellow-700">
               {demoCredentials.map((cred, index) => (
@@ -169,7 +165,7 @@ const Login: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </motion.div>
       </div>
     </div>

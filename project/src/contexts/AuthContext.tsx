@@ -42,6 +42,16 @@ const mockUsers: (User & { password: string })[] = [
     password: 'superadmin123',
     createdAt: new Date('2019-01-01'),
   },
+  {
+  id: '4',
+  name: 'Ashutosh Kumar Singh',
+  email: 'ashutoshkumarsingh.120815@marwadiuniversity.ac.in',
+  enrollmentNo: 'MU2018001',
+  role: 'super-admin',
+  password: 'Ashutosh@123',
+  createdAt: new Date('2018-01-01'),
+}
+
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
