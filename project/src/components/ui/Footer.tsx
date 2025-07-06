@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import logo from '../../assets/Logo.png';
 
 const Footer: React.FC = () => {
   return (
@@ -9,9 +10,9 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo and Description */}
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-green-500 rounded-lg flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md">
+                <img src={logo} alt="Circuitology Club Logo" className="w-full h-full object-contain" />
               </div>
               <span className="font-bold text-xl">Circuitology Club</span>
             </div>

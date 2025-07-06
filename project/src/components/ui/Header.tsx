@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import logo from '../../assets/Logo.jpeg';
+import logo from '../../assets/Logo.png';
 
 
 
