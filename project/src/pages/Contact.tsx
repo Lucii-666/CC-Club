@@ -26,32 +26,46 @@ const Contact: React.FC = () => {
 
   const teamMembers = [
     {
-      name: 'Dr. Sarah Johnson',
-      role: 'Club Advisor',
-      email: 'sarah.johnson@marwadiuniversity.ac.in',
-      phone: '+91 98765 43210',
-      image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=300'
+      name: 'Prof. Vijay Dubey',
+      role: 'Club Co-Ordinator',
+      email: 'ashutoshkumarsingh.120815@marwadiuniversity.ac.in',
+      phone: '+91 97232 65278',
+      image: '/Images/Sir.jpeg'
     },
     {
-      name: 'Rahul Patel',
-      role: 'Club President',
-      email: 'rahul.patel@marwadiuniversity.ac.in',
-      phone: '+91 98765 43211',
-      image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=300'
+      name: 'Ashutosh Kumar Singh',
+      role: 'Deputy Convener',
+      email: 'ashutoshkumarsingh.120815@marwadiuniversity.ac.in',
+      phone: '+91 90816 96945',
+      image: '/Images/Ashutosh.jpeg'
     },
     {
-      name: 'Priya Sharma',
-      role: 'Technical Lead',
-      email: 'priya.sharma@marwadiuniversity.ac.in',
-      phone: '+91 98765 43212',
-      image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=300'
+      name: 'Rishi Sampat',
+      role: 'General Secretary',
+      email: 'rishi.sampat131574@marwadiuniversity.ac.in',
+      phone: '+91 91041 10042',
+      image: '/Images/Rishi.jpeg'
+    },
+     {
+      name: 'Ruhaan Pathan',
+      role: 'Event Coordinator',
+      email: 'ruhaan.pathan132253@marwadiuniversity.ac.in',
+      phone: '+91 63533 34811',
+      image: '/Images/Ruhaan.jpg'
     },
     {
-      name: 'Arjun Singh',
-      role: 'Project Coordinator',
-      email: 'arjun.singh@marwadiuniversity.ac.in',
+      name: 'Dhwani Desai',
+      role: 'Tech Lead',
+      email: 'dhwani.desai130930@marwadiuniversity.ac.in',
+      phone: '+91 70165 14210',
+      image: '/Images/Dhwani.jpeg'
+    },
+   {
+      name: 'Diva Parekh',
+      role: 'Content Manager',
+      email: 'diva.parekh131119@marwadiuniversity.ac.in',
       phone: '+91 98765 43213',
-      image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=300'
+      image: '/Images/Diva.jpeg'
     },
   ];
 
@@ -233,7 +247,7 @@ const Contact: React.FC = () => {
         {/* Team Members */}
         <div className="mt-16">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Our Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {teamMembers.map((member, index) => (
               <motion.div
                 key={index}
@@ -245,7 +259,7 @@ const Contact: React.FC = () => {
                 <img
                   src={member.image}
                   alt={member.name}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-80 object-cover"
                 />
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">{member.name}</h3>
