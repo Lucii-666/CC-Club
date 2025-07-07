@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, User, MessageCircle } from 'lucide-react';
 import EditableText from '../components/ui/EditableText';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase'; // ensure path is correct
+
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -16,21 +19,45 @@ const Contact: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
-    // Reset form
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    await addDoc(collection(db, 'messages'), {
+      name: formData.name,
+      email: formData.email,
+      subject: formData.subject,
+      message: formData.message,
+      timestamp: serverTimestamp(),
+    });
+
+    console.log('Message sent successfully');
+    alert('Message sent!');
+
+    // Reset form after successful submission
     setFormData({ name: '', email: '', subject: '', message: '' });
-  };
+  } catch (error) {
+    console.error('Error sending message:', error);
+    alert('Failed to send message.');
+  }
+};
+
 
   const teamMembers = [
     {
       name: 'Prof. Vijay Dubey',
       role: 'Club Co-Ordinator',
-      email: 'ashutoshkumarsingh.120815@marwadiuniversity.ac.in',
+      email: 'vijay.dubey@marwadieducation.edu.in',
       phone: '+91 97232 65278',
       image: '/Images/Sir.jpeg'
+    },
+        {
+      name: 'Angel Oza',
+      role: 'Convener',
+      email: 'angeloza.123042@marwadiuniversity.ac.in',
+      phone: '+91 99788 44231',
+      image: '/Images/ANGEL.png'
     },
     {
       name: 'Ashutosh Kumar Singh',
@@ -68,6 +95,8 @@ const Contact: React.FC = () => {
       image: '/Images/Diva.jpeg'
     },
   ];
+const leader = teamMembers[0];            // First member: Prof. Vijay Dubey
+const otherMembers = teamMembers.slice(1); // Rest of the members
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -199,7 +228,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-900">Email</h3>
-                    <p className="text-gray-600">contact@circuitology.club</p>
+                    <p className="text-gray-600">circuitologyclub.mu@gmail.com</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -208,7 +237,8 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-900">Phone</h3>
-                    <p className="text-gray-600">+91 98765 43210</p>
+                    <p className="text-gray-600">+91 90816 96945</p>
+                    <p className="text-gray-600">+91 63533 34811</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -217,7 +247,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-900">Location</h3>
-                    <p className="text-gray-600">Marwadi University, Rajkot, Gujarat</p>
+                    <p className="text-gray-600">MA 108, Marwadi University, Rajkot, Gujarat</p>
                   </div>
                 </div>
               </div>
@@ -247,37 +277,60 @@ const Contact: React.FC = () => {
         {/* Team Members */}
         <div className="mt-16">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Our Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {teamMembers.map((member, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-              >
-                <img
-                  src={member.image}
-                  alt={member.name}
-                  className="w-full h-80 object-cover"
-                />
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{member.name}</h3>
-                  <p className="text-blue-600 font-medium mb-4">{member.role}</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Mail className="w-4 h-4" />
-                      <span>{member.email}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Phone className="w-4 h-4" />
-                      <span>{member.phone}</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+         <div className="grid grid-cols-1 place-items-center mb-12">
+          <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full max-w-sm">
+    <img src={leader.image} alt={leader.name} className="w-full h-64 object-cover" />
+    <div className="p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-1">{leader.name}</h3>
+      <p className="text-blue-600 font-medium mb-4">{leader.role}</p>
+      <div className="space-y-2">
+        <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <Mail className="w-4 h-4" />
+          <span>{leader.email}</span>
+        </div>
+        <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <Phone className="w-4 h-4" />
+          <span>{leader.phone}</span>
+        </div>
+      </div>
+    </div>
+  </motion.div>
+</div>
+
+
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+  {otherMembers.map((member, index) => (
+    <motion.div
+      key={index}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+    >
+      <img src={member.image} alt={member.name} className="w-full h-64 object-cover" />
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">{member.name}</h3>
+        <p className="text-blue-600 font-medium mb-4">{member.role}</p>
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Mail className="w-4 h-4" />
+            <span>{member.email}</span>
           </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Phone className="w-4 h-4" />
+            <span>{member.phone}</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  ))}
+</div>
+
         </div>
       </div>
     </div>
