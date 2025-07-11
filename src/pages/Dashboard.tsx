@@ -22,22 +22,31 @@ import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const { components, requests, events, updateRequest, resetContent, addEvent, updateEvent, deleteEvent } = useData();
+  const { 
+    components, 
+    requests, 
+    updateRequest, 
+    addComponent,
+    updateComponent,
+    deleteComponent,
+    loading 
+  } = useData();
   const [activeTab, setActiveTab] = useState('overview');
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<string | null>(null);
-  const [eventForm, setEventForm] = useState({
-    title: '',
+  const [showComponentForm, setShowComponentForm] = useState(false);
+  const [editingComponent, setEditingComponent] = useState<string | null>(null);
+  const [componentForm, setComponentForm] = useState({
+    name: '',
+    category: '',
     description: '',
-    date: '',
-    time: '',
+    specifications: '',
+    total_quantity: 0,
+    available_quantity: 0,
+    image_url: '',
     location: '',
-    maxParticipants: 50,
-    imageUrl: '',
-    tags: '',
+    low_stock_threshold: 5,
   });
 
-  if (!user || (user.role !== 'admin' && user.role !== 'super-admin')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
     return <Navigate to="/login" replace />;
   }
 
@@ -61,96 +70,105 @@ const Dashboard: React.FC = () => {
       color: 'bg-green-500',
     },
     {
-      icon: Calendar,
-      title: 'Upcoming Events',
-      value: events.filter(e => new Date(e.date) >= new Date()).length,
-      color: 'bg-purple-500',
+      icon: AlertTriangle,
+      title: 'Low Stock Items',
+      value: components.filter(c => c.available_quantity <= c.low_stock_threshold).length,
+      color: 'bg-red-500',
     },
   ];
 
-  const handleApproveRequest = (requestId: string) => {
-    const request = requests.find(r => r.id === requestId);
-    if (request) {
-      updateRequest({
-        ...request,
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      await updateRequest(requestId, {
         status: 'approved',
-        approvedBy: user.name,
-        approvedDate: new Date(),
+        approved_by: user.id,
+        approved_date: new Date().toISOString(),
       });
+    } catch (error) {
+      console.error('Error approving request:', error);
+      alert('Failed to approve request');
     }
   };
 
-  const handleRejectRequest = (requestId: string) => {
-    const request = requests.find(r => r.id === requestId);
-    if (request) {
-      updateRequest({
-        ...request,
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      await updateRequest(requestId, {
         status: 'rejected',
-        approvedBy: user.name,
-        approvedDate: new Date(),
+        approved_by: user.id,
+        approved_date: new Date().toISOString(),
       });
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      alert('Failed to reject request');
     }
   };
 
-  const handleEventSubmit = (e: React.FormEvent) => {
+  const handleComponentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const eventData = {
-      ...eventForm,
-      date: new Date(eventForm.date),
-      tags: eventForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      registeredParticipants: [],
-      createdBy: user.id,
-    };
+    try {
+      const componentData = {
+        ...componentForm,
+        specifications: componentForm.specifications ? JSON.parse(componentForm.specifications) : {},
+      };
 
-    if (editingEvent) {
-      const existingEvent = events.find(e => e.id === editingEvent);
-      if (existingEvent) {
-        updateEvent({
-          ...existingEvent,
-          ...eventData,
-        });
+      if (editingComponent) {
+        await updateComponent(editingComponent, componentData);
+        setEditingComponent(null);
+      } else {
+        await addComponent(componentData);
       }
-      setEditingEvent(null);
-    } else {
-      addEvent(eventData);
-    }
 
-    setEventForm({
-      title: '',
-      description: '',
-      date: '',
-      time: '',
-      location: '',
-      maxParticipants: 50,
-      imageUrl: '',
-      tags: '',
-    });
-    setShowEventForm(false);
+      setComponentForm({
+        name: '',
+        category: '',
+        description: '',
+        specifications: '',
+        total_quantity: 0,
+        available_quantity: 0,
+        image_url: '',
+        location: '',
+        low_stock_threshold: 5,
+      });
+      setShowComponentForm(false);
+    } catch (error) {
+      console.error('Error saving component:', error);
+      alert('Failed to save component');
+    }
   };
 
-  const handleEditEvent = (event: any) => {
-    setEventForm({
-      title: event.title,
-      description: event.description,
-      date: format(new Date(event.date), 'yyyy-MM-dd'),
-      time: event.time,
-      location: event.location,
-      maxParticipants: event.maxParticipants,
-      imageUrl: event.imageUrl,
-      tags: event.tags.join(', '),
+  const handleEditComponent = (component: any) => {
+    setComponentForm({
+      name: component.name,
+      category: component.category,
+      description: component.description,
+      specifications: JSON.stringify(component.specifications),
+      total_quantity: component.total_quantity,
+      available_quantity: component.available_quantity,
+      image_url: component.image_url || '',
+      location: component.location || '',
+      low_stock_threshold: component.low_stock_threshold,
     });
-    setEditingEvent(event.id);
-    setShowEventForm(true);
+    setEditingComponent(component.id);
+    setShowComponentForm(true);
   };
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'requests', label: 'Requests', icon: Clock },
     { id: 'components', label: 'Components', icon: Package },
-    { id: 'events', label: 'Events', icon: Calendar },
-    { id: 'content', label: 'Content', icon: Edit },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -211,211 +229,6 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="p-6">
-            {activeTab === 'events' && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Manage Events</h3>
-                  <motion.button
-                    onClick={() => setShowEventForm(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Event</span>
-                  </motion.button>
-                </div>
-
-                {showEventForm && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gray-50 rounded-lg p-6 mb-6"
-                  >
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">
-                      {editingEvent ? 'Edit Event' : 'Add New Event'}
-                    </h4>
-                    <form onSubmit={handleEventSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
-                        <input
-                          type="text"
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.title}
-                          onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                        <input
-                          type="date"
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.date}
-                          onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g., 10:00 AM - 2:00 PM"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.time}
-                          onChange={(e) => setEventForm({ ...eventForm, time: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                        <input
-                          type="text"
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.location}
-                          onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Max Participants</label>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.maxParticipants}
-                          onChange={(e) => setEventForm({ ...eventForm, maxParticipants: parseInt(e.target.value) })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-                        <input
-                          type="url"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.imageUrl}
-                          onChange={(e) => setEventForm({ ...eventForm, imageUrl: e.target.value })}
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                        <textarea
-                          required
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.description}
-                          onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g., Arduino, Workshop, Beginner"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={eventForm.tags}
-                          onChange={(e) => setEventForm({ ...eventForm, tags: e.target.value })}
-                        />
-                      </div>
-                      <div className="md:col-span-2 flex space-x-2">
-                        <button
-                          type="submit"
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                        >
-                          {editingEvent ? 'Update Event' : 'Create Event'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowEventForm(false);
-                            setEditingEvent(null);
-                            setEventForm({
-                              title: '',
-                              description: '',
-                              date: '',
-                              time: '',
-                              location: '',
-                              maxParticipants: 50,
-                              imageUrl: '',
-                              tags: '',
-                            });
-                          }}
-                          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </motion.div>
-                )}
-
-                <div className="space-y-4">
-                  {events.map((event) => (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="border border-gray-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{event.title}</h4>
-                          <p className="text-sm text-gray-600 mb-2">{event.description}</p>
-                          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{format(new Date(event.date), 'MMM d, yyyy')}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{event.time}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{event.location}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <UserPlus className="w-4 h-4" />
-                              <span>{event.registeredParticipants.length}/{event.maxParticipants}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditEvent(event)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteEvent(event.id)}
-                            className="p-1 text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      {event.registeredParticipants.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Registered Participants:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {event.registeredParticipants.map((participantId, index) => (
-                              <span
-                                key={index}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                              >
-                                User {participantId}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -426,8 +239,12 @@ const Dashboard: React.FC = () => {
                       {requests.slice(0, 5).map((request) => (
                         <div key={request.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div>
-                            <p className="font-medium text-gray-900">{request.studentName}</p>
-                            <p className="text-sm text-gray-600">{request.components.length} components</p>
+                            <p className="font-medium text-gray-900">
+                              {request.user_profile?.name || 'Unknown User'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {request.component?.name} (Qty: {request.quantity})
+                            </p>
                           </div>
                           <span className={`px-2 py-1 text-xs font-medium rounded ${
                             request.status === 'pending' ? 'bg-orange-100 text-orange-700' :
@@ -445,14 +262,17 @@ const Dashboard: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Low Stock Alert</h3>
                     <div className="space-y-3">
-                      {components.filter(c => c.quantity <= 5).map((component) => (
+                      {components
+                        .filter(c => c.available_quantity <= c.low_stock_threshold)
+                        .slice(0, 5)
+                        .map((component) => (
                         <div key={component.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                           <div>
                             <p className="font-medium text-gray-900">{component.name}</p>
                             <p className="text-sm text-gray-600">{component.category}</p>
                           </div>
                           <span className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-700">
-                            {component.quantity} left
+                            {component.available_quantity} left
                           </span>
                         </div>
                       ))}
@@ -470,8 +290,12 @@ const Dashboard: React.FC = () => {
                     <div key={request.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="font-medium text-gray-900">{request.studentName}</h4>
-                          <p className="text-sm text-gray-600">{request.studentEmail}</p>
+                          <h4 className="font-medium text-gray-900">
+                            {request.user_profile?.name || 'Unknown User'}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {request.user_profile?.email || 'No email'}
+                          </p>
                         </div>
                         <span className={`px-2 py-1 text-xs font-medium rounded ${
                           request.status === 'pending' ? 'bg-orange-100 text-orange-700' :
@@ -482,15 +306,16 @@ const Dashboard: React.FC = () => {
                         </span>
                       </div>
                       <div className="mb-3">
-                        <p className="text-sm text-gray-600 mb-1">Components:</p>
-                        <ul className="text-sm text-gray-900">
-                          {request.components.map((comp, index) => (
-                            <li key={index}>• {comp.componentName} (Qty: {comp.quantity})</li>
-                          ))}
-                        </ul>
+                        <p className="text-sm text-gray-600 mb-1">Component:</p>
+                        <p className="text-sm text-gray-900">
+                          {request.component?.name} (Qty: {request.quantity})
+                        </p>
                       </div>
                       <p className="text-sm text-gray-600 mb-3">
                         <strong>Purpose:</strong> {request.purpose}
+                      </p>
+                      <p className="text-sm text-gray-600 mb-3">
+                        <strong>Expected Return:</strong> {format(new Date(request.expected_return_date), 'MMM d, yyyy')}
                       </p>
                       {request.status === 'pending' && (
                         <div className="flex space-x-2">
@@ -518,18 +343,146 @@ const Dashboard: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Manage Components</h3>
-                  <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                  <button 
+                    onClick={() => setShowComponentForm(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                  >
                     <Plus className="w-4 h-4" />
                     <span>Add Component</span>
                   </button>
                 </div>
+
+                {showComponentForm && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gray-50 rounded-lg p-6 mb-6"
+                  >
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">
+                      {editingComponent ? 'Edit Component' : 'Add New Component'}
+                    </h4>
+                    <form onSubmit={handleComponentSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.name}
+                          onChange={(e) => setComponentForm({ ...componentForm, name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.category}
+                          onChange={(e) => setComponentForm({ ...componentForm, category: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Total Quantity</label>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.total_quantity}
+                          onChange={(e) => setComponentForm({ ...componentForm, total_quantity: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Available Quantity</label>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.available_quantity}
+                          onChange={(e) => setComponentForm({ ...componentForm, available_quantity: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.location}
+                          onChange={(e) => setComponentForm({ ...componentForm, location: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                        <input
+                          type="url"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.image_url}
+                          onChange={(e) => setComponentForm({ ...componentForm, image_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea
+                          required
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.description}
+                          onChange={(e) => setComponentForm({ ...componentForm, description: e.target.value })}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Specifications (JSON)</label>
+                        <textarea
+                          rows={2}
+                          placeholder='{"voltage": "5V", "current": "100mA"}'
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={componentForm.specifications}
+                          onChange={(e) => setComponentForm({ ...componentForm, specifications: e.target.value })}
+                        />
+                      </div>
+                      <div className="md:col-span-2 flex space-x-2">
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                        >
+                          {editingComponent ? 'Update Component' : 'Create Component'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowComponentForm(false);
+                            setEditingComponent(null);
+                            setComponentForm({
+                              name: '',
+                              category: '',
+                              description: '',
+                              specifications: '',
+                              total_quantity: 0,
+                              available_quantity: 0,
+                              image_url: '',
+                              location: '',
+                              low_stock_threshold: 5,
+                            });
+                          }}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                )}
+
                 <div className="overflow-x-auto">
                   <table className="w-full table-auto">
                     <thead>
                       <tr className="bg-gray-50">
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Name</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Category</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Quantity</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Available</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Total</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Status</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-900">Actions</th>
                       </tr>
@@ -539,23 +492,34 @@ const Dashboard: React.FC = () => {
                         <tr key={component.id}>
                           <td className="px-4 py-2 text-sm text-gray-900">{component.name}</td>
                           <td className="px-4 py-2 text-sm text-gray-900">{component.category}</td>
-                          <td className="px-4 py-2 text-sm text-gray-900">{component.quantity}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900">{component.available_quantity}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900">{component.total_quantity}</td>
                           <td className="px-4 py-2">
                             <span className={`px-2 py-1 text-xs font-medium rounded ${
-                              component.quantity > 5 ? 'bg-green-100 text-green-700' :
-                              component.quantity > 0 ? 'bg-orange-100 text-orange-700' :
+                              component.available_quantity > component.low_stock_threshold ? 'bg-green-100 text-green-700' :
+                              component.available_quantity > 0 ? 'bg-orange-100 text-orange-700' :
                               'bg-red-100 text-red-700'
                             }`}>
-                              {component.quantity > 5 ? 'In Stock' :
-                               component.quantity > 0 ? 'Low Stock' : 'Out of Stock'}
+                              {component.available_quantity > component.low_stock_threshold ? 'In Stock' :
+                               component.available_quantity > 0 ? 'Low Stock' : 'Out of Stock'}
                             </span>
                           </td>
                           <td className="px-4 py-2">
                             <div className="flex space-x-2">
-                              <button className="p-1 text-blue-600 hover:text-blue-800">
+                              <button 
+                                onClick={() => handleEditComponent(component)}
+                                className="p-1 text-blue-600 hover:text-blue-800"
+                              >
                                 <Edit className="w-4 h-4" />
                               </button>
-                              <button className="p-1 text-red-600 hover:text-red-800">
+                              <button 
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to delete this component?')) {
+                                    deleteComponent(component.id);
+                                  }
+                                }}
+                                className="p-1 text-red-600 hover:text-red-800"
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -564,34 +528,6 @@ const Dashboard: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'content' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Content Management</h3>
-                  <button
-                    onClick={resetContent}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
-                  >
-                    Reset to Default
-                  </button>
-                </div>
-                <p className="text-gray-600 mb-6">
-                  All content on the website is editable. Visit any page and click the edit icons to modify content in real-time.
-                  Changes are automatically saved and will persist until reset.
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">How to Edit Content:</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Navigate to any page on the website</li>
-                    <li>• Look for the edit icons (✏️) that appear when you hover over text</li>
-                    <li>• Click the edit icon to modify the content</li>
-                    <li>• Your changes are automatically saved</li>
-                    <li>• Use the "Reset to Default" button to restore original content</li>
-                  </ul>
                 </div>
               </div>
             )}

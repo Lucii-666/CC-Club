@@ -1,431 +1,451 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Component, Request, Project, ProjectRequest, Resource, Event, EditableContent } from '../types';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
+
+// Types
+interface Component {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  specifications: any;
+  total_quantity: number;
+  available_quantity: number;
+  issued_quantity: number;
+  damaged_quantity: number;
+  image_url: string | null;
+  low_stock_threshold: number;
+  location: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+interface ComponentRequest {
+  id: string;
+  user_id: string;
+  component_id: string;
+  quantity: number;
+  purpose: string;
+  expected_return_date: string;
+  status: 'pending' | 'approved' | 'rejected' | 'issued' | 'returned';
+  request_date: string;
+  approved_by: string | null;
+  approved_date: string | null;
+  issued_date: string | null;
+  returned_date: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  component?: Component;
+  user_profile?: {
+    name: string;
+    email: string;
+  };
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string | null;
+  image_url: string | null;
+  bio: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Notification {
+  id: string;
+  user_id: string | null;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  is_read: boolean;
+  action_url: string | null;
+  created_at: string;
+}
 
 interface DataContextType {
   components: Component[];
-  specialComponents: Component[];
-  requests: Request[];
-  projects: Project[];
-  projectRequests: ProjectRequest[];
-  resources: Resource[];
-  events: Event[];
-  editableContent: EditableContent;
-  updateComponent: (component: Component) => void;
-  addComponent: (component: Omit<Component, 'id'>) => void;
-  deleteComponent: (componentId: string) => void;
-  addRequest: (request: Omit<Request, 'id' | 'requestDate'>) => void;
-  updateRequest: (request: Request) => void;
-  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => void;
-  updateProject: (project: Project) => void;
-  deleteProject: (projectId: string) => void;
-  addProjectRequest: (request: Omit<ProjectRequest, 'id' | 'requestDate'>) => void;
-  updateProjectRequest: (request: ProjectRequest) => void;
-  addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => void;
-  updateEvent: (event: Event) => void;
-  deleteEvent: (eventId: string) => void;
-  registerForEvent: (eventId: string, userId: string) => void;
-  unregisterFromEvent: (eventId: string, userId: string) => void;
-  updateEditableContent: (key: string, value: string) => void;
-  resetContent: () => void;
+  requests: ComponentRequest[];
+  teamMembers: TeamMember[];
+  notifications: Notification[];
+  loading: boolean;
+  
+  // Component operations
+  fetchComponents: () => Promise<void>;
+  addComponent: (component: Omit<Component, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateComponent: (id: string, updates: Partial<Component>) => Promise<void>;
+  deleteComponent: (id: string) => Promise<void>;
+  
+  // Request operations
+  fetchRequests: () => Promise<void>;
+  addRequest: (request: Omit<ComponentRequest, 'id' | 'created_at' | 'updated_at' | 'request_date'>) => Promise<void>;
+  updateRequest: (id: string, updates: Partial<ComponentRequest>) => Promise<void>;
+  
+  // Team member operations
+  fetchTeamMembers: () => Promise<void>;
+  addTeamMember: (member: Omit<TeamMember, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateTeamMember: (id: string, updates: Partial<TeamMember>) => Promise<void>;
+  deleteTeamMember: (id: string) => Promise<void>;
+  
+  // Notification operations
+  fetchNotifications: () => Promise<void>;
+  addNotification: (notification: Omit<Notification, 'id' | 'created_at'>) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Mock data with real images
-const mockComponents: Component[] = [
-  {
-    id: '1',
-    name: 'Arduino Uno R3',
-    category: 'Microcontrollers',
-    specifications: 'ATmega328P, 14 digital I/O pins, 6 analog inputs',
-    quantity: 15,
-    isRestricted: false,
-    isSpecial: false,
-    imageUrl: 'https://images.pexels.com/photos/442150/pexels-photo-442150.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'Popular microcontroller board for beginners',
-    location: 'Shelf A-1',
-  },
-  {
-    id: '2',
-    name: 'Raspberry Pi 4',
-    category: 'Single Board Computers',
-    specifications: '4GB RAM, Quad-core ARM Cortex-A72',
-    quantity: 8,
-    isRestricted: true,
-    isSpecial: false,
-    imageUrl: 'https://images.pexels.com/photos/442150/pexels-photo-442150.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'Powerful single-board computer',
-    location: 'Shelf A-2',
-  },
-  {
-    id: '3',
-    name: 'Breadboard (830 points)',
-    category: 'Prototyping',
-    specifications: '830 tie points, 2 power rails',
-    quantity: 25,
-    isRestricted: false,
-    isSpecial: false,
-    imageUrl: 'https://images.pexels.com/photos/442150/pexels-photo-442150.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'Essential for circuit prototyping',
-    location: 'Shelf B-1',
-  },
-];
-
-const mockSpecialComponents: Component[] = [
-  {
-    id: 'sp1',
-    name: 'FPGA Development Board',
-    category: 'Advanced Microcontrollers',
-    specifications: 'Xilinx Artix-7, 100T FPGA, DDR3 Memory',
-    quantity: 3,
-    isRestricted: true,
-    isSpecial: true,
-    imageUrl: 'https://images.pexels.com/photos/163100/circuit-circuit-board-resistor-computer-163100.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'Advanced FPGA board for complex digital designs',
-    location: 'Special Equipment Room',
-  },
-  {
-    id: 'sp2',
-    name: 'High-Precision Oscilloscope',
-    category: 'Test Equipment',
-    specifications: '500MHz, 4 channels, 5 GSa/s sampling rate',
-    quantity: 1,
-    isRestricted: true,
-    isSpecial: true,
-    imageUrl: 'https://images.pexels.com/photos/163100/circuit-circuit-board-resistor-computer-163100.jpeg?auto=compress&cs=tinysrgb&w=400',
-    description: 'Professional-grade oscilloscope for advanced measurements',
-    location: 'Special Equipment Room',
-  },
-];
-
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    title: 'Smart Home Automation',
-    description: 'Complete home automation system using Arduino and IoT modules with voice control and mobile app integration',
-    imageUrl: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600',
-    contributors: ['John Doe', 'Jane Smith'],
-    tags: ['IoT', 'Arduino', 'Home Automation'],
-    difficulty: 'intermediate',
-    createdAt: new Date('2023-12-01'),
-    createdBy: '1',
-    status: 'approved',
-    githubUrl: 'https://github.com/example/smart-home',
-    demoUrl: 'https://smarthome-demo.com',
-  },
-  {
-    id: '2',
-    title: 'Line Following Robot',
-    description: 'Autonomous robot that follows a black line using infrared sensors and PID control algorithm',
-    imageUrl: 'https://images.pexels.com/photos/2599244/pexels-photo-2599244.jpeg?auto=compress&cs=tinysrgb&w=600',
-    contributors: ['Mike Johnson'],
-    tags: ['Robotics', 'Sensors', 'Arduino'],
-    difficulty: 'beginner',
-    createdAt: new Date('2023-11-15'),
-    createdBy: '2',
-    status: 'approved',
-    githubUrl: 'https://github.com/example/line-robot',
-  },
-];
-
-const mockProjectRequests: ProjectRequest[] = [
-  {
-    id: '1',
-    studentId: '1',
-    studentName: 'John Doe',
-    studentEmail: 'john.doe@marwadiuniversity.ac.in',
-    projectTitle: 'Weather Monitoring Station',
-    projectDescription: 'IoT-based weather station with real-time data logging and web dashboard',
-    projectImageUrl: 'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=600',
-    githubUrl: 'https://github.com/johndoe/weather-station',
-    tags: ['IoT', 'Sensors', 'Data Logging'],
-    difficulty: 'intermediate',
-    status: 'pending',
-    requestDate: new Date('2024-01-20'),
-  },
-];
-
-const mockEvents: Event[] = [
-  {
-    id: '1',
-    title: 'Arduino Workshop for Beginners',
-    description: 'Learn the basics of Arduino programming and build your first LED circuit',
-    date: new Date('2024-02-15'),
-    time: '10:00 AM - 2:00 PM',
-    location: 'Electronics Lab, Room 301',
-    maxParticipants: 30,
-    registeredParticipants: ['1', '2'],
-    imageUrl: 'https://images.pexels.com/photos/442150/pexels-photo-442150.jpeg?auto=compress&cs=tinysrgb&w=600',
-    tags: ['Arduino', 'Workshop', 'Beginner'],
-    createdBy: 'admin',
-    createdAt: new Date('2024-01-10'),
-  },
-  {
-    id: '2',
-    title: 'PCB Design Competition',
-    description: 'Design the most innovative PCB layout and win exciting prizes',
-    date: new Date('2024-02-28'),
-    time: '9:00 AM - 5:00 PM',
-    location: 'Main Auditorium',
-    maxParticipants: 50,
-    registeredParticipants: ['1'],
-    imageUrl: 'https://images.pexels.com/photos/163100/circuit-circuit-board-resistor-computer-163100.jpeg?auto=compress&cs=tinysrgb&w=600',
-    tags: ['PCB', 'Competition', 'Design'],
-    createdBy: 'admin',
-    createdAt: new Date('2024-01-05'),
-  },
-];
-
-const defaultEditableContent: EditableContent = {
-  'hero.title': 'Welcome to Circuitology Club',
-  'hero.subtitle': 'Where Innovation Meets Electronics',
-  'hero.description': 'Join our community of electronics enthusiasts and makers. Access components, learn new skills, and bring your ideas to life.',
-  'about.title': 'About Our Club',
-  'about.description': 'The Circuitology Club is a vibrant community of electronics enthusiasts, engineers, and makers. We provide resources, mentorship, and opportunities for hands-on learning in the field of electronics and embedded systems.',
-  'mission.title': 'Our Mission',
-  'mission.description': 'To foster innovation and learning in electronics through hands-on projects, component access, and collaborative learning.',
-  'contact.title': 'Get in Touch',
-  'contact.description': 'Have questions or need help with your project? Our team is here to assist you.',
-  'events.title': 'Upcoming Events',
-  'events.description': 'Join our exciting workshops, competitions, and showcases to enhance your electronics skills.',
-  'special.title': 'Special Components',
-  'special.description': 'Advanced equipment and components for specialized projects and research.',
-};
-
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [components, setComponents] = useState<Component[]>(mockComponents);
-  const [specialComponents, setSpecialComponents] = useState<Component[]>(mockSpecialComponents);
-  const [requests, setRequests] = useState<Request[]>([]);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [projectRequests, setProjectRequests] = useState<ProjectRequest[]>(mockProjectRequests);
-  const [resources] = useState<Resource[]>([]);
-  const [events, setEvents] = useState<Event[]>(mockEvents);
-  const [editableContent, setEditableContent] = useState<EditableContent>(defaultEditableContent);
+  const { user } = useAuth();
+  const [components, setComponents] = useState<Component[]>([]);
+  const [requests, setRequests] = useState<ComponentRequest[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch components
+  const fetchComponents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('components')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setComponents(data || []);
+    } catch (error) {
+      console.error('Error fetching components:', error);
+    }
+  };
+
+  // Add component
+  const addComponent = async (component: Omit<Component, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('components')
+        .insert([{ ...component, created_by: user?.id }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setComponents(prev => [...prev, data]);
+    } catch (error) {
+      console.error('Error adding component:', error);
+      throw error;
+    }
+  };
+
+  // Update component
+  const updateComponent = async (id: string, updates: Partial<Component>) => {
+    try {
+      const { data, error } = await supabase
+        .from('components')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setComponents(prev => prev.map(c => c.id === id ? data : c));
+    } catch (error) {
+      console.error('Error updating component:', error);
+      throw error;
+    }
+  };
+
+  // Delete component
+  const deleteComponent = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('components')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setComponents(prev => prev.filter(c => c.id !== id));
+    } catch (error) {
+      console.error('Error deleting component:', error);
+      throw error;
+    }
+  };
+
+  // Fetch requests
+  const fetchRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('component_requests')
+        .select(`
+          *,
+          component:components(*),
+          user_profile:profiles(name, email)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+    }
+  };
+
+  // Add request
+  const addRequest = async (request: Omit<ComponentRequest, 'id' | 'created_at' | 'updated_at' | 'request_date'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('component_requests')
+        .insert([{ ...request, user_id: user?.id }])
+        .select(`
+          *,
+          component:components(*),
+          user_profile:profiles(name, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      setRequests(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Error adding request:', error);
+      throw error;
+    }
+  };
+
+  // Update request
+  const updateRequest = async (id: string, updates: Partial<ComponentRequest>) => {
+    try {
+      const { data, error } = await supabase
+        .from('component_requests')
+        .update(updates)
+        .eq('id', id)
+        .select(`
+          *,
+          component:components(*),
+          user_profile:profiles(name, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      setRequests(prev => prev.map(r => r.id === id ? data : r));
+    } catch (error) {
+      console.error('Error updating request:', error);
+      throw error;
+    }
+  };
+
+  // Fetch team members
+  const fetchTeamMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (error) throw error;
+      setTeamMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+    }
+  };
+
+  // Add team member
+  const addTeamMember = async (member: Omit<TeamMember, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert([member])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setTeamMembers(prev => [...prev, data]);
+    } catch (error) {
+      console.error('Error adding team member:', error);
+      throw error;
+    }
+  };
+
+  // Update team member
+  const updateTeamMember = async (id: string, updates: Partial<TeamMember>) => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setTeamMembers(prev => prev.map(m => m.id === id ? data : m));
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      throw error;
+    }
+  };
+
+  // Delete team member
+  const deleteTeamMember = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setTeamMembers(prev => prev.filter(m => m.id !== id));
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      throw error;
+    }
+  };
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Add notification
+  const addNotification = async (notification: Omit<Notification, 'id' | 'created_at'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert([notification])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setNotifications(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Error adding notification:', error);
+      throw error;
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  };
+
+  // Initial data fetch
   useEffect(() => {
-    const savedContent = localStorage.getItem('circuitology_content');
-    if (savedContent) {
-      setEditableContent(JSON.parse(savedContent));
-    }
-
-    const savedEvents = localStorage.getItem('circuitology_events');
-    if (savedEvents) {
-      setEvents(JSON.parse(savedEvents).map((event: any) => ({
-        ...event,
-        date: new Date(event.date),
-        createdAt: new Date(event.createdAt),
-      })));
-    }
-
-    const savedProjects = localStorage.getItem('circuitology_projects');
-    if (savedProjects) {
-      setProjects(JSON.parse(savedProjects).map((project: any) => ({
-        ...project,
-        createdAt: new Date(project.createdAt),
-      })));
-    }
-
-    const savedProjectRequests = localStorage.getItem('circuitology_project_requests');
-    if (savedProjectRequests) {
-      setProjectRequests(JSON.parse(savedProjectRequests).map((request: any) => ({
-        ...request,
-        requestDate: new Date(request.requestDate),
-        reviewedDate: request.reviewedDate ? new Date(request.reviewedDate) : undefined,
-      })));
-    }
-
-    const savedComponents = localStorage.getItem('circuitology_components');
-    if (savedComponents) {
-      setComponents(JSON.parse(savedComponents));
-    }
-
-    const savedSpecialComponents = localStorage.getItem('circuitology_special_components');
-    if (savedSpecialComponents) {
-      setSpecialComponents(JSON.parse(savedSpecialComponents));
-    }
-  }, []);
-
-  const updateComponent = (component: Component) => {
-    if (component.isSpecial) {
-      const updatedComponents = specialComponents.map(c => c.id === component.id ? component : c);
-      setSpecialComponents(updatedComponents);
-      localStorage.setItem('circuitology_special_components', JSON.stringify(updatedComponents));
-    } else {
-      const updatedComponents = components.map(c => c.id === component.id ? component : c);
-      setComponents(updatedComponents);
-      localStorage.setItem('circuitology_components', JSON.stringify(updatedComponents));
-    }
-  };
-
-  const addComponent = (component: Omit<Component, 'id'>) => {
-    const newComponent: Component = {
-      ...component,
-      id: Date.now().toString(),
+    const initializeData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchComponents(),
+        fetchRequests(),
+        fetchTeamMembers(),
+        user ? fetchNotifications() : Promise.resolve(),
+      ]);
+      setLoading(false);
     };
 
-    if (component.isSpecial) {
-      const updatedComponents = [...specialComponents, newComponent];
-      setSpecialComponents(updatedComponents);
-      localStorage.setItem('circuitology_special_components', JSON.stringify(updatedComponents));
-    } else {
-      const updatedComponents = [...components, newComponent];
-      setComponents(updatedComponents);
-      localStorage.setItem('circuitology_components', JSON.stringify(updatedComponents));
+    initializeData();
+  }, [user]);
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    const subscriptions: any[] = [];
+
+    // Subscribe to component changes
+    const componentSub = supabase
+      .channel('components')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'components' }, () => {
+        fetchComponents();
+      })
+      .subscribe();
+
+    // Subscribe to request changes
+    const requestSub = supabase
+      .channel('component_requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'component_requests' }, () => {
+        fetchRequests();
+      })
+      .subscribe();
+
+    // Subscribe to team member changes
+    const teamSub = supabase
+      .channel('team_members')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
+        fetchTeamMembers();
+      })
+      .subscribe();
+
+    // Subscribe to notification changes for current user
+    if (user) {
+      const notificationSub = supabase
+        .channel('notifications')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          fetchNotifications();
+        })
+        .subscribe();
+      
+      subscriptions.push(notificationSub);
     }
-  };
 
-  const deleteComponent = (componentId: string) => {
-    const regularUpdated = components.filter(c => c.id !== componentId);
-    const specialUpdated = specialComponents.filter(c => c.id !== componentId);
-    
-    setComponents(regularUpdated);
-    setSpecialComponents(specialUpdated);
-    localStorage.setItem('circuitology_components', JSON.stringify(regularUpdated));
-    localStorage.setItem('circuitology_special_components', JSON.stringify(specialUpdated));
-  };
+    subscriptions.push(componentSub, requestSub, teamSub);
 
-  const addRequest = (request: Omit<Request, 'id' | 'requestDate'>) => {
-    const newRequest: Request = {
-      ...request,
-      id: Date.now().toString(),
-      requestDate: new Date(),
+    return () => {
+      subscriptions.forEach(sub => supabase.removeChannel(sub));
     };
-    setRequests(prev => [...prev, newRequest]);
-  };
-
-  const updateRequest = (request: Request) => {
-    setRequests(prev => prev.map(r => r.id === request.id ? request : r));
-  };
-
-  const addProject = (project: Omit<Project, 'id' | 'createdAt'>) => {
-    const newProject: Project = {
-      ...project,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    const updatedProjects = [...projects, newProject];
-    setProjects(updatedProjects);
-    localStorage.setItem('circuitology_projects', JSON.stringify(updatedProjects));
-  };
-
-  const updateProject = (project: Project) => {
-    const updatedProjects = projects.map(p => p.id === project.id ? project : p);
-    setProjects(updatedProjects);
-    localStorage.setItem('circuitology_projects', JSON.stringify(updatedProjects));
-  };
-
-  const deleteProject = (projectId: string) => {
-    const updatedProjects = projects.filter(p => p.id !== projectId);
-    setProjects(updatedProjects);
-    localStorage.setItem('circuitology_projects', JSON.stringify(updatedProjects));
-  };
-
-  const addProjectRequest = (request: Omit<ProjectRequest, 'id' | 'requestDate'>) => {
-    const newRequest: ProjectRequest = {
-      ...request,
-      id: Date.now().toString(),
-      requestDate: new Date(),
-    };
-    const updatedRequests = [...projectRequests, newRequest];
-    setProjectRequests(updatedRequests);
-    localStorage.setItem('circuitology_project_requests', JSON.stringify(updatedRequests));
-  };
-
-  const updateProjectRequest = (request: ProjectRequest) => {
-    const updatedRequests = projectRequests.map(r => r.id === request.id ? request : r);
-    setProjectRequests(updatedRequests);
-    localStorage.setItem('circuitology_project_requests', JSON.stringify(updatedRequests));
-  };
-
-  const addEvent = (event: Omit<Event, 'id' | 'createdAt'>) => {
-    const newEvent: Event = {
-      ...event,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    const updatedEvents = [...events, newEvent];
-    setEvents(updatedEvents);
-    localStorage.setItem('circuitology_events', JSON.stringify(updatedEvents));
-  };
-
-  const updateEvent = (event: Event) => {
-    const updatedEvents = events.map(e => e.id === event.id ? event : e);
-    setEvents(updatedEvents);
-    localStorage.setItem('circuitology_events', JSON.stringify(updatedEvents));
-  };
-
-  const deleteEvent = (eventId: string) => {
-    const updatedEvents = events.filter(e => e.id !== eventId);
-    setEvents(updatedEvents);
-    localStorage.setItem('circuitology_events', JSON.stringify(updatedEvents));
-  };
-
-  const registerForEvent = (eventId: string, userId: string) => {
-    const updatedEvents = events.map(event => {
-      if (event.id === eventId && !event.registeredParticipants.includes(userId)) {
-        return {
-          ...event,
-          registeredParticipants: [...event.registeredParticipants, userId],
-        };
-      }
-      return event;
-    });
-    setEvents(updatedEvents);
-    localStorage.setItem('circuitology_events', JSON.stringify(updatedEvents));
-  };
-
-  const unregisterFromEvent = (eventId: string, userId: string) => {
-    const updatedEvents = events.map(event => {
-      if (event.id === eventId) {
-        return {
-          ...event,
-          registeredParticipants: event.registeredParticipants.filter(id => id !== userId),
-        };
-      }
-      return event;
-    });
-    setEvents(updatedEvents);
-    localStorage.setItem('circuitology_events', JSON.stringify(updatedEvents));
-  };
-
-  const updateEditableContent = (key: string, value: string) => {
-    const newContent = { ...editableContent, [key]: value };
-    setEditableContent(newContent);
-    localStorage.setItem('circuitology_content', JSON.stringify(newContent));
-  };
-
-  const resetContent = () => {
-    setEditableContent(defaultEditableContent);
-    localStorage.removeItem('circuitology_content');
-  };
+  }, [user]);
 
   return (
     <DataContext.Provider value={{
       components,
-      specialComponents,
       requests,
-      projects,
-      projectRequests,
-      resources,
-      events,
-      editableContent,
-      updateComponent,
+      teamMembers,
+      notifications,
+      loading,
+      fetchComponents,
       addComponent,
+      updateComponent,
       deleteComponent,
+      fetchRequests,
       addRequest,
       updateRequest,
-      addProject,
-      updateProject,
-      deleteProject,
-      addProjectRequest,
-      updateProjectRequest,
-      addEvent,
-      updateEvent,
-      deleteEvent,
-      registerForEvent,
-      unregisterFromEvent,
-      updateEditableContent,
-      resetContent,
+      fetchTeamMembers,
+      addTeamMember,
+      updateTeamMember,
+      deleteTeamMember,
+      fetchNotifications,
+      addNotification,
+      markNotificationAsRead,
     }}>
       {children}
     </DataContext.Provider>

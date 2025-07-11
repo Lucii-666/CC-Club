@@ -8,7 +8,7 @@ import { useData } from '../contexts/DataContext';
 const ComponentRequest: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { components, addRequest } = useData();
+  const { components, addRequest, loading } = useData();
   const [selectedComponents, setSelectedComponents] = useState<Array<{
     componentId: string;
     componentName: string;
@@ -17,15 +17,14 @@ const ComponentRequest: React.FC = () => {
   }>>([]);
   const [purpose, setPurpose] = useState('');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (!user) {
     navigate('/login');
     return null;
   }
 
-  const availableComponents = components.filter(c => 
-    c.quantity > 0 && (!c.isRestricted || user.role === 'super-admin')
-  );
+  const availableComponents = components.filter(c => c.available_quantity > 0);
 
   const handleAddComponent = (componentId: string) => {
     const component = components.find(c => c.id === componentId);
@@ -45,7 +44,7 @@ const ComponentRequest: React.FC = () => {
         componentId,
         componentName: component.name,
         quantity: 1,
-        maxQuantity: component.quantity,
+        maxQuantity: component.available_quantity,
       }]);
     }
   };
@@ -67,7 +66,7 @@ const ComponentRequest: React.FC = () => {
     setSelectedComponents(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (selectedComponents.length === 0) {
@@ -85,20 +84,45 @@ const ComponentRequest: React.FC = () => {
       return;
     }
 
-    const request = {
-      studentId: user.id,
-      studentName: user.name,
-      studentEmail: user.email,
-      components: selectedComponents,
-      purpose: purpose.trim(),
-      expectedReturnDate: new Date(expectedReturnDate),
-      status: 'pending' as const,
-    };
+    try {
+      setSubmitting(true);
 
-    addRequest(request);
-    alert('Request submitted successfully!');
-    navigate('/dashboard');
+      // Create a request for each selected component
+      for (const component of selectedComponents) {
+        await addRequest({
+          component_id: component.componentId,
+          quantity: component.quantity,
+          purpose: purpose.trim(),
+          expected_return_date: expectedReturnDate,
+          status: 'pending',
+          approved_by: null,
+          approved_date: null,
+          issued_date: null,
+          returned_date: null,
+          notes: null,
+        });
+      }
+
+      alert('Request submitted successfully!');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      alert('Failed to submit request. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading components...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -127,7 +151,7 @@ const ComponentRequest: React.FC = () => {
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{component.name}</h3>
                     <p className="text-sm text-gray-600">{component.category}</p>
-                    <p className="text-sm text-green-600">Available: {component.quantity}</p>
+                    <p className="text-sm text-green-600">Available: {component.available_quantity}</p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -250,12 +274,19 @@ const ComponentRequest: React.FC = () => {
               {/* Submit Button */}
               <motion.button
                 type="submit"
+                disabled={submitting}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+                className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Package className="w-5 h-5" />
-                <span>Submit Request</span>
+                {submitting ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                ) : (
+                  <>
+                    <Package className="w-5 h-5" />
+                    <span>Submit Request</span>
+                  </>
+                )}
               </motion.button>
             </form>
           </div>
